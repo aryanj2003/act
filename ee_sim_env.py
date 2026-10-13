@@ -35,7 +35,18 @@ def make_ee_sim_env(task_name):
                                         right_gripper_qvel (1)]     # normalized gripper velocity (pos: opening, neg: closing)
                         "images": {"main": (480x640x3)}        # h, w, c, dtype='uint8'
     """
-    if 'sim_transfer_cube' in task_name:
+    if 'sim_transfer_cube_scripted' in task_name:
+        if 'mirrored' in task_name:
+            xml_path = os.path.join(XML_DIR, f'bimanual_viperx_ee_transfer_cube.xml')
+            physics = mujoco.Physics.from_xml_path(xml_path)
+            task = TransferCubeEETask(random=False, is_mirrored=True)
+        else:
+            xml_path = os.path.join(XML_DIR, f'bimanual_viperx_ee_transfer_cube_orig.xml')
+            physics = mujoco.Physics.from_xml_path(xml_path)
+            task = TransferCubeEETask(random=False)
+        env = control.Environment(physics, task, time_limit=20, control_timestep=DT,
+                                  n_sub_steps=None, flat_observation=False)
+    elif 'sim_transfer_cube_human' in task_name:
         xml_path = os.path.join(XML_DIR, f'bimanual_viperx_ee_transfer_cube.xml')
         physics = mujoco.Physics.from_xml_path(xml_path)
         task = TransferCubeEETask(random=False)
@@ -48,6 +59,7 @@ def make_ee_sim_env(task_name):
         env = control.Environment(physics, task, time_limit=20, control_timestep=DT,
                                   n_sub_steps=None, flat_observation=False)
     else:
+        print(task_name)
         raise NotImplementedError
     return env
 
@@ -69,8 +81,8 @@ class BimanualViperXEETask(base.Task):
         np.copyto(physics.data.mocap_quat[1], action_right[3:7])
 
         # set gripper
-        g_left_ctrl = PUPPET_GRIPPER_POSITION_UNNORMALIZE_FN(action_left[7])
-        g_right_ctrl = PUPPET_GRIPPER_POSITION_UNNORMALIZE_FN(action_right[7])
+        g_left_ctrl = PUPPET_GRIPPER_POSITION_UNNORMALIZE_FN(action_left[6])
+        g_right_ctrl = PUPPET_GRIPPER_POSITION_UNNORMALIZE_FN(action_right[6])
         np.copyto(physics.data.ctrl, np.array([g_left_ctrl, -g_left_ctrl, g_right_ctrl, -g_right_ctrl]))
 
     def initialize_robots(self, physics):
@@ -151,9 +163,10 @@ class BimanualViperXEETask(base.Task):
 
 
 class TransferCubeEETask(BimanualViperXEETask):
-    def __init__(self, random=None):
+    def __init__(self, random=None, is_mirrored=False):
         super().__init__(random=random)
         self.max_reward = 4
+        self.is_mirrored = is_mirrored
 
     def initialize_episode(self, physics):
         """Sets the state of the environment at the start of each episode."""
@@ -162,6 +175,7 @@ class TransferCubeEETask(BimanualViperXEETask):
         cube_pose = sample_box_pose()
         box_start_idx = physics.model.name2id('red_box_joint', 'joint')
         np.copyto(physics.data.qpos[box_start_idx : box_start_idx + 7], cube_pose)
+        
         # print(f"randomized cube position to {cube_position}")
 
         super().initialize_episode(physics)
@@ -187,14 +201,26 @@ class TransferCubeEETask(BimanualViperXEETask):
         touch_table = ("red_box", "table") in all_contact_pairs
 
         reward = 0
-        if touch_right_gripper:
-            reward = 1
-        if touch_right_gripper and not touch_table: # lifted
-            reward = 2
-        if touch_left_gripper: # attempted transfer
-            reward = 3
-        if touch_left_gripper and not touch_table: # successful transfer
-            reward = 4
+        
+        if self.is_mirrored: # Mirrored task: cube transfers from left to right
+            if touch_left_gripper:
+                reward = 1
+            if touch_left_gripper and not touch_table: # lifted
+                reward = 2
+            if touch_right_gripper: # attempted transfer
+                reward = 3
+            if touch_right_gripper and not touch_table: # successful transfer
+                reward = 4
+
+        else: 
+            if touch_right_gripper:
+                reward = 1
+            if touch_right_gripper and not touch_table: # lifted
+                reward = 2
+            if touch_left_gripper: # attempted transfer
+                reward = 3
+            if touch_left_gripper and not touch_table: # successful transfer
+                reward = 4
         return reward
 
 

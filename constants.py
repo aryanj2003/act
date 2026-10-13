@@ -1,10 +1,20 @@
 import pathlib
 
 ### Task parameters
-DATA_DIR = '<put your data dir here>'
+# DATA_DIR = '<put your data dir here>'
+# DATA_DIR = '/home/hong/interbotix_ws/src/aloha/data'
+DATA_DIR = '/media/hong/home/hong0745/aloha/data' # For the other partition
+
 SIM_TASK_CONFIGS = {
     'sim_transfer_cube_scripted':{
         'dataset_dir': DATA_DIR + '/sim_transfer_cube_scripted',
+        'num_episodes': 20,
+        'episode_len': 400,
+        'camera_names': ['top']
+    },
+    
+    'sim_transfer_cube_scripted_mirrored':{
+        'dataset_dir': DATA_DIR + '/sim_transfer_cube_scripted_mirrored',
         'num_episodes': 50,
         'episode_len': 400,
         'camera_names': ['top']
@@ -74,3 +84,5 @@ PUPPET_POS2JOINT = lambda x: PUPPET_GRIPPER_POSITION_NORMALIZE_FN(x) * (PUPPET_G
 PUPPET_JOINT2POS = lambda x: PUPPET_GRIPPER_POSITION_UNNORMALIZE_FN((x - PUPPET_GRIPPER_JOINT_CLOSE) / (PUPPET_GRIPPER_JOINT_OPEN - PUPPET_GRIPPER_JOINT_CLOSE))
 
 MASTER_GRIPPER_JOINT_MID = (MASTER_GRIPPER_JOINT_OPEN + MASTER_GRIPPER_JOINT_CLOSE)/2
+
+

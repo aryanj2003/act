@@ -8,7 +8,7 @@ import h5py
 from constants import PUPPET_GRIPPER_POSITION_NORMALIZE_FN, SIM_TASK_CONFIGS
 from ee_sim_env import make_ee_sim_env
 from sim_env import make_sim_env, BOX_POSE
-from scripted_policy import PickAndTransferPolicy, InsertionPolicy
+from scripted_policy import PickAndTransferPolicy, InsertionPolicy, PickAndTransferPolicyMirrored
 
 import IPython
 e = IPython.embed
@@ -37,11 +37,13 @@ def main(args):
     camera_names = SIM_TASK_CONFIGS[task_name]['camera_names']
     if task_name == 'sim_transfer_cube_scripted':
         policy_cls = PickAndTransferPolicy
+    elif task_name == 'sim_transfer_cube_scripted_mirrored':
+        policy_cls = PickAndTransferPolicyMirrored
     elif task_name == 'sim_insertion_scripted':
         policy_cls = InsertionPolicy
     else:
         raise NotImplementedError
-
+    crtls = []
     success = []
     for episode_idx in range(num_episodes):
         print(f'{episode_idx=}')
@@ -58,7 +60,10 @@ def main(args):
             plt.ion()
         for step in range(episode_len):
             action = policy(ts)
+            # print(action[8], action[15])
             ts = env.step(action)
+            print(ts.observation['gripper_ctrl'])
+            print(ts.observation['qpos'][6])
             episode.append(ts)
             if onscreen_render:
                 plt_img.set_data(ts.observation['images'][render_cam_name])
@@ -76,10 +81,15 @@ def main(args):
         # replace gripper pose with gripper control
         gripper_ctrl_traj = [ts.observation['gripper_ctrl'] for ts in episode]
         for joint, ctrl in zip(joint_traj, gripper_ctrl_traj):
+            print(joint.shape, ctrl.shape)
+            exit()
             left_ctrl = PUPPET_GRIPPER_POSITION_NORMALIZE_FN(ctrl[0])
             right_ctrl = PUPPET_GRIPPER_POSITION_NORMALIZE_FN(ctrl[2])
+            crtls.append(left_ctrl)
             joint[6] = left_ctrl
             joint[6+7] = right_ctrl
+            
+        # print (f'{crtls=}')
 
         subtask_info = episode[0].observation['env_state'].copy() # box pose at step 0
 

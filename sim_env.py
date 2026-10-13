@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from dm_control import mujoco
 from dm_control.rl import control
 from dm_control.suite import base
+from utils import sample_box_pose, sample_insertion_pose
 
 from constants import DT, XML_DIR, START_ARM_POSE
 from constants import PUPPET_GRIPPER_POSITION_UNNORMALIZE_FN
@@ -36,9 +37,14 @@ def make_sim_env(task_name):
                         "images": {"main": (480x640x3)}        # h, w, c, dtype='uint8'
     """
     if 'sim_transfer_cube' in task_name:
-        xml_path = os.path.join(XML_DIR, f'bimanual_viperx_transfer_cube.xml')
-        physics = mujoco.Physics.from_xml_path(xml_path)
-        task = TransferCubeTask(random=False)
+        if 'mirrored' in task_name:
+            xml_path = os.path.join(XML_DIR, f'bimanual_viperx_transfer_cube.xml')
+            physics = mujoco.Physics.from_xml_path(xml_path)
+            task = TransferCubeTask(random=False, is_mirrored=True)
+        else:
+            xml_path = os.path.join(XML_DIR, f'bimanual_viperx_transfer_cube_orig.xml')
+            physics = mujoco.Physics.from_xml_path(xml_path)
+            task = TransferCubeTask(random=False)
         env = control.Environment(physics, task, time_limit=20, control_timestep=DT,
                                   n_sub_steps=None, flat_observation=False)
     elif 'sim_insertion' in task_name:
@@ -117,11 +123,11 @@ class BimanualViperXTask(base.Task):
         # return whether left gripper is holding the box
         raise NotImplementedError
 
-
 class TransferCubeTask(BimanualViperXTask):
-    def __init__(self, random=None):
+    def __init__(self, random=None, is_mirrored=False):
         super().__init__(random=random)
         self.max_reward = 4
+        self.is_mirrored = is_mirrored
 
     def initialize_episode(self, physics):
         """Sets the state of the environment at the start of each episode."""
@@ -156,16 +162,27 @@ class TransferCubeTask(BimanualViperXTask):
         touch_table = ("red_box", "table") in all_contact_pairs
 
         reward = 0
-        if touch_right_gripper:
-            reward = 1
-        if touch_right_gripper and not touch_table: # lifted
-            reward = 2
-        if touch_left_gripper: # attempted transfer
-            reward = 3
-        if touch_left_gripper and not touch_table: # successful transfer
-            reward = 4
+        if self.is_mirrored: # Reversed task: cube transfers from left to right
+            if touch_left_gripper:
+                reward = 1
+            if touch_left_gripper and not touch_table: # lifted
+                reward = 2
+            if touch_right_gripper: # attempted transfer
+                reward = 3
+            if touch_right_gripper and not touch_table: # successful transfer
+                reward = 4
+            
+        else:
+            if touch_right_gripper:
+                reward = 1
+            if touch_right_gripper and not touch_table: # lifted
+                reward = 2
+            if touch_left_gripper: # attempted transfer
+                reward = 3
+            if touch_left_gripper and not touch_table: # successful transfer
+                reward = 4
+                
         return reward
-
 
 class InsertionTask(BimanualViperXTask):
     def __init__(self, random=None):
@@ -227,7 +244,6 @@ class InsertionTask(BimanualViperXTask):
         if pin_touched: # successful insertion
             reward = 4
         return reward
-
 
 def get_action(master_bot_left, master_bot_right):
     action = np.zeros(14)

@@ -4,6 +4,7 @@ from pyquaternion import Quaternion
 
 from constants import SIM_TASK_CONFIGS
 from ee_sim_env import make_ee_sim_env
+from sim_env import make_sim_env
 
 import IPython
 e = IPython.embed
@@ -63,7 +64,6 @@ class BasePolicy:
         self.step_count += 1
         return np.concatenate([action_left, action_right])
 
-
 class PickAndTransferPolicy(BasePolicy):
 
     def generate_trajectory(self, ts_first):
@@ -102,7 +102,45 @@ class PickAndTransferPolicy(BasePolicy):
             {"t": 360, "xyz": meet_xyz + np.array([0.1, 0, 0]), "quat": gripper_pick_quat.elements, "gripper": 1}, # move to right
             {"t": 400, "xyz": meet_xyz + np.array([0.1, 0, 0]), "quat": gripper_pick_quat.elements, "gripper": 1}, # stay
         ]
+        
+class PickAndTransferPolicyMirrored(BasePolicy):
 
+    def generate_trajectory(self, ts_first):
+        init_mocap_pose_right = ts_first.observation['mocap_pose_right']
+        init_mocap_pose_left = ts_first.observation['mocap_pose_left']
+
+        box_info = np.array(ts_first.observation['env_state'])
+        box_xyz = box_info[:3]
+        box_quat = box_info[3:]
+        # print(f"Generate trajectory for {box_xyz=}")
+
+        gripper_pick_quat = Quaternion(init_mocap_pose_left[3:])
+        gripper_pick_quat = gripper_pick_quat * Quaternion(axis=[0.0, 1.0, 0.0], degrees=60)
+
+        meet_right_quat = Quaternion(axis=[1.0, 0.0, 0.0], degrees=90)
+
+        meet_xyz = np.array([0, 0.5, 0.25])
+
+        self.right_trajectory = [
+            {"t": 0, "xyz": init_mocap_pose_right[:3], "quat": init_mocap_pose_right[3:], "gripper": 0}, # sleep
+            {"t": 100, "xyz": meet_xyz + np.array([0.1, 0, -0.02]), "quat": meet_right_quat.elements, "gripper": 1}, # approach meet position
+            {"t": 260, "xyz": meet_xyz + np.array([-0.02, 0, -0.02]), "quat": meet_right_quat.elements, "gripper": 1}, # move to meet position
+            {"t": 310, "xyz": meet_xyz + np.array([-0.02, 0, -0.02]), "quat": meet_right_quat.elements, "gripper": 0}, # close gripper
+            {"t": 360, "xyz": meet_xyz + np.array([0.1, 0, -0.02]), "quat": np.array([1, 0, 0, 0]), "gripper": 0}, # move right
+            {"t": 400, "xyz": meet_xyz + np.array([0.1, 0, -0.02]), "quat": np.array([1, 0, 0, 0]), "gripper": 0}, # stay
+        ]
+
+        self.left_trajectory = [
+            {"t": 0, "xyz": init_mocap_pose_left[:3], "quat": init_mocap_pose_left[3:], "gripper": 0}, # sleep
+            {"t": 90, "xyz": box_xyz + np.array([0, 0, 0.08]), "quat": gripper_pick_quat.elements, "gripper": 1}, # approach the cube
+            {"t": 130, "xyz": box_xyz + np.array([0, 0, -0.015]), "quat": gripper_pick_quat.elements, "gripper": 1}, # go down
+            {"t": 170, "xyz": box_xyz + np.array([0, 0, -0.015]), "quat": gripper_pick_quat.elements, "gripper": 0}, # close gripper
+            {"t": 200, "xyz": meet_xyz + np.array([-0.05, 0, 0]), "quat": gripper_pick_quat.elements, "gripper": 0}, # approach meet position
+            {"t": 220, "xyz": meet_xyz, "quat": gripper_pick_quat.elements, "gripper": 0}, # move to meet position
+            {"t": 310, "xyz": meet_xyz, "quat": gripper_pick_quat.elements, "gripper": 1}, # open gripper
+            {"t": 360, "xyz": meet_xyz + np.array([-0.1, 0, 0]), "quat": gripper_pick_quat.elements, "gripper": 1}, # move to left
+            {"t": 400, "xyz": meet_xyz + np.array([-0.1, 0, 0]), "quat": gripper_pick_quat.elements, "gripper": 1}, # stay
+        ]
 
 class InsertionPolicy(BasePolicy):
 
@@ -148,7 +186,6 @@ class InsertionPolicy(BasePolicy):
 
         ]
 
-
 def test_policy(task_name):
     # example rolling out pick_and_transfer policy
     onscreen_render = True
@@ -157,9 +194,12 @@ def test_policy(task_name):
     # setup the environment
     episode_len = SIM_TASK_CONFIGS[task_name]['episode_len']
     if 'sim_transfer_cube' in task_name:
-        env = make_ee_sim_env('sim_transfer_cube')
+        # env = make_ee_sim_env('sim_transfer_cube')
+        env = make_ee_sim_env(task_name)
+        # env = make_sim_env(task_name)
     elif 'sim_insertion' in task_name:
-        env = make_ee_sim_env('sim_insertion')
+        env = make_ee_sim_env(task_name)
+        # env = make_ee_sim_env('sim_insertion')
     else:
         raise NotImplementedError
 
@@ -172,6 +212,7 @@ def test_policy(task_name):
             plt.ion()
 
         policy = PickAndTransferPolicy(inject_noise)
+        policy = PickAndTransferPolicyMirrored(inject_noise)
         for step in range(episode_len):
             action = policy(ts)
             ts = env.step(action)

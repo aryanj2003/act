@@ -112,9 +112,10 @@ def load_data(dataset_dir, num_episodes, camera_names, batch_size_train, batch_s
     print(f'\nData from: {dataset_dir}\n')
     # obtain train test split
     train_ratio = 0.8
+    number_of_samples_per_episode = 1
     shuffled_indices = np.random.permutation(num_episodes)
-    train_indices = shuffled_indices[:int(train_ratio * num_episodes)]
-    val_indices = shuffled_indices[int(train_ratio * num_episodes):]
+    train_indices = list(shuffled_indices[:int(train_ratio * num_episodes)])*number_of_samples_per_episode
+    val_indices = list(shuffled_indices[int(train_ratio * num_episodes):])*number_of_samples_per_episode
 
     # obtain normalization stats for qpos and action
     norm_stats = get_norm_stats(dataset_dir, num_episodes)
@@ -131,7 +132,8 @@ def load_data(dataset_dir, num_episodes, camera_names, batch_size_train, batch_s
 ### env utils
 
 def sample_box_pose():
-    x_range = [0.0, 0.2]
+    # x_range = [0.0, 0.2]
+    x_range = [-0.2, 0.0]
     y_range = [0.4, 0.6]
     z_range = [0.05, 0.05]
 

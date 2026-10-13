@@ -140,7 +140,6 @@ class TransformerDecoder(nn.Module):
 
         return output.unsqueeze(0)
 
-
 class TransformerEncoderLayer(nn.Module):
 
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1,
@@ -199,7 +198,6 @@ class TransformerEncoderLayer(nn.Module):
         if self.normalize_before:
             return self.forward_pre(src, src_mask, src_key_padding_mask, pos)
         return self.forward_post(src, src_mask, src_key_padding_mask, pos)
-
 
 class TransformerDecoderLayer(nn.Module):
 

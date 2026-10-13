@@ -7,6 +7,10 @@ data_local
 .vscode
 _wandb
 
+# Local robot checkpoints and offline evaluation artifacts
+ckpt/
+offline_check_ep*.png
+
 **/.DS_Store
 
 fuse.cfg

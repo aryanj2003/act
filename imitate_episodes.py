@@ -173,6 +173,8 @@ def eval_bc(config, ckpt_name, save_episode=True):
     stats_path = os.path.join(ckpt_dir, f'dataset_stats.pkl')
     with open(stats_path, 'rb') as f:
         stats = pickle.load(f)
+        
+
 
     pre_process = lambda s_qpos: (s_qpos - stats['qpos_mean']) / stats['qpos_std']
     post_process = lambda a: a * stats['action_std'] + stats['action_mean']
@@ -190,7 +192,7 @@ def eval_bc(config, ckpt_name, save_episode=True):
 
     query_frequency = policy_config['num_queries']
     if temporal_agg:
-        query_frequency = 1
+        query_frequency = 5
         num_queries = policy_config['num_queries']
 
     max_timesteps = int(max_timesteps * 1) # may increase for real-world tasks
@@ -217,7 +219,8 @@ def eval_bc(config, ckpt_name, save_episode=True):
         ### evaluation loop
         if temporal_agg:
             all_time_actions = torch.zeros([max_timesteps, max_timesteps+num_queries, state_dim]).cuda()
-
+        
+        
         qpos_history = torch.zeros((1, max_timesteps, state_dim)).cuda()
         image_list = [] # for visualization
         qpos_list = []
